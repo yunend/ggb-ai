@@ -75,6 +75,17 @@
       })
     }
 
+    function switchPerspective(is3D) {
+      if (!ggbApplet.value) return
+      try {
+        ggbApplet.value.evalCommand(is3D ? 'SetPerspective("AGT")' : 'SetPerspective("AG")')
+        enable3D.value = is3D
+      } catch (e) {
+        console.warn('SetPerspective failed, fallback to rebuild:', e)
+        setEnable3D(is3D)
+      }
+    }
+
     function setEnable3D(value) {
       enable3D.value = value
       rebuildApplet(value)
@@ -127,7 +138,8 @@
       enable3D,
       toggleToolBar,
       setEnable3D,
-      resetApplet
+      resetApplet,
+      switchPerspective
     }
   }
 
