@@ -8,14 +8,14 @@
     const ggbApplet = ref(null)
     const ggbElement = ref(null)
     const show = ref(true)
-    const enable3D = ref(false)
+    const perspectiveIs3D = ref(false)
 
     let resizeObserver = null
     let currentAppletWrapper = null
 
-    function buildAppletConfig(is3D) {
+    function buildAppletConfig() {
       return {
-        appName: is3D ? '3d' : 'classic',
+        appName: 'classic',
         showToolBar: true,
         showAlgebraInput: true,
         showMenuBar: true,
@@ -46,53 +46,33 @@
       })
     }
 
-    function initGGBApplet(is3D) {
+    function initGGBApplet() {
       if (!window.GGBApplet) {
         console.error('GGBApplet not found. Is deployggb.js loaded?')
         return null
       }
-      const config = buildAppletConfig(is3D)
+      const config = buildAppletConfig()
       const wrapper = new window.GGBApplet(config)
       wrapper.inject('ggb-element', 'html5')
       currentAppletWrapper = wrapper
       return wrapper
     }
 
-    function rebuildApplet(is3D) {
-      ggbApplet.value = null
-      try {
-        if (currentAppletWrapper) {
-          currentAppletWrapper.removeExistingApplet('ggb-element', false)
-        }
-      } catch (e) {
-        console.warn('removeExistingApplet failed:', e)
-      }
-      const container = document.getElementById('ggb-element')
-      if (container) container.innerHTML = ''
-      requestAnimationFrame(() => {
-        initGGBApplet(is3D)
-        requestAnimationFrame(() => resizeGGB())
-      })
-    }
-
     function switchPerspective(is3D) {
       if (!ggbApplet.value) return
       try {
         ggbApplet.value.evalCommand(is3D ? 'SetPerspective("AGT")' : 'SetPerspective("AG")')
-        enable3D.value = is3D
+        perspectiveIs3D.value = is3D
       } catch (e) {
-        console.warn('SetPerspective failed, fallback to rebuild:', e)
-        setEnable3D(is3D)
+        console.warn('SetPerspective failed:', e)
       }
     }
 
-    function setEnable3D(value) {
-      enable3D.value = value
-      rebuildApplet(value)
-    }
-
     function resetApplet() {
-      rebuildApplet(enable3D.value)
+      // 只清空所有对象，保留当前视角
+      if (ggbApplet.value) {
+        try { ggbApplet.value.evalCommand('Delete({})') } catch (e) { console.warn('resetApplet:', e) }
+      }
     }
 
     function toggleToolBar() {
@@ -110,7 +90,7 @@
       // 如果 GeoGebra deployggb.js 还没加载完（defer），等 window.GGBApplet 出现再初始化
       const tryInit = () => {
         if (window.GGBApplet) {
-          initGGBApplet(false)
+          initGGBApplet()
           if (ggbElement.value) {
             resizeObserver = new ResizeObserver(resizeGGB)
             resizeObserver.observe(ggbElement.value)
@@ -135,9 +115,8 @@
       ggbApplet,
       ggbElement,
       show,
-      enable3D,
+      perspectiveIs3D,
       toggleToolBar,
-      setEnable3D,
       resetApplet,
       switchPerspective
     }
