@@ -100,7 +100,7 @@
           async function run() {
             if (!props.ggbApplet) { output.value = '❌ GGB Applet 尚未加载完成'; return }
             if (running.value) return
-            pendingLines = code.value.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#')).flatMap(l => l.split(';').map(s => s.trim())).filter(l => l)
+            pendingLines = code.value.split('\n').map(l => { const i = l.indexOf('#'); return (i >= 0 ? l.substring(0, i) : l).trim() }).filter(l => l).flatMap(l => l.split(';').map(s => s.trim())).filter(l => l)
             if (pendingLines.length === 0) { dialogType.value = 'success'; confirmMsg.value = '没有可执行的指令'; confirmVisible.value = true; return }
             running.value = true; emit('update:running', true); output.value = ''
             let hadError = false, userStopped = false
@@ -164,10 +164,21 @@
                 }
                 console.debug('[DEBUG] tryEval 最终 →', err ? '失败 [' + src + ']' : '成功', err ? 'msg=' + String(err).trim() : '')
                 if (err) return { ok: false, msg: (src ? '[' + src + '] ' : '') + String(err).trim() }
-                // evalCommand 返回 false 且所有错误渠道都没内容 → 判成功但加警告提示
+                // evalCommand 返回 false 但所有错误渠道都没内容
+                // GGB classic bug：所有脚本/查询类命令（改状态、不产生对象）执行成功但返回 false
+                // 用前缀分类代替硬编码白名单——避免不断补漏（SetConditionToShowObject/SetFilling 等新命令无需再手动加）
+                //   - SetXxx / ShowXxx / HideXxx / ZoomXxx / GetXxx / ExistsXxx / IsXxx → 脚本/查询命令 → 判成功
+                //   - 其他（Circle / Polygon / Segment / Point 等构造命令）→ 判失败
                 if (evalResult === false) {
-                  console.warn('[DEBUG] evalCommand=false 但无任何错误信息 → 判成功（GGB API 不可靠）')
-                  return { ok: false, msg: '⚠ evalCommand 返回 false 但未检测到错误，可能成功也可能失败' }
+                  const cmdAlias = line.match(/^\s*[A-Za-z]+/) ? line.match(/^\s*[A-Za-z]+/)[0].toLowerCase() : ''
+                  const SCRIPT_CMD_PREFIXES = ['set', 'show', 'hide', 'zoom', 'get', 'exists', 'is', 'reset', 'toggle', 'close', 'open']
+                  const isScriptCmd = SCRIPT_CMD_PREFIXES.some(p => cmdAlias.startsWith(p))
+                  if (isScriptCmd) {
+                    console.warn('[DEBUG] evalCommand=false 但脚本命令（前缀: ' + cmdAlias + '） → 实际成功（GGB classic bug）')
+                    return { ok: true, msg: '' }
+                  }
+                  console.warn('[DEBUG] evalCommand=false 且是构造命令（' + cmdAlias + '） → 判失败（真错误）')
+                  return { ok: false, msg: 'evalCommand 返回 false 但未检测到错误（命令: ' + cmdAlias + '）' }
                 }
                 return { ok: true, msg: '' }
               }
