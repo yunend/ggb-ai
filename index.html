@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>GGB-AI</title>
+    <link rel="shortcut icon" href="./logo.ico" type="image/x-icon">
     <script src="./js/vue@3.5.13-global-prod.js"></script>
     <script src="./js/tailwind@3.4.17.js"></script>
     <script defer src="./GeoGebra/deployggb.js"></script>
@@ -109,15 +110,66 @@
               if (manualStopped) break
               const line = pendingLines.shift()
               let ok = false, msg = ''
-              const tryEval = (cmd) => {
+              const tryEval = async (cmd) => {
+                console.debug('[DEBUG] tryEval 开始:', cmd)
+                let evalResult = undefined
+                let evalErr = null
                 try {
-                  props.ggbApplet.evalCommand(cmd)
-                  if (typeof props.ggbApplet.getError === 'function') {
-                    const err = props.ggbApplet.getError()
-                    if (err && typeof err === 'string' && err.length > 0) return { ok: false, msg: 'GeoGebra 错误: ' + err }
+                  evalResult = props.ggbApplet.evalCommand(cmd)
+                  console.debug('[DEBUG] evalCommand 返回值:', evalResult, typeof evalResult)
+                } catch (e) {
+                  evalErr = e.message || String(e)
+                  console.warn('[DEBUG] evalCommand 抛异常:', evalErr)
+                  return { ok: false, msg: evalErr }
+                }
+                // 如果 evalCommand 返回 false，先 dump 所有可疑的错误 getter 方法
+                if (evalResult === false) {
+                  console.debug('[DEBUG] evalCommand=false, dump ggbApplet 上所有 error/exception/message 相关方法:')
+                  const allKeys = Object.getOwnPropertyNames(props.ggbApplet).concat(Object.keys(props.ggbApplet))
+                  const errorKeys = [...new Set(allKeys)].filter(k => /error|exception|message|warning|notice|last/i.test(k))
+                  for (const k of errorKeys) {
+                    try {
+                      const fn = props.ggbApplet[k]
+                      if (typeof fn === 'function') {
+                        const r = fn.call(props.ggbApplet)
+                        console.debug('[DEBUG]', k, '() →', JSON.stringify(r))
+                      }
+                    } catch (e) { console.debug('[DEBUG]', k, '抛异常:', e.message) }
                   }
-                  return { ok: true, msg: '' }
-                } catch (e) { return { ok: false, msg: e.message || String(e) } }
+                }
+                // 多轮检测：立即查 + 等 GGB 异步刷新再查
+                const tryGetErr = () => {
+                  let err = null, src = null
+                  const checks = ['getError','getErrorMessage','getException','getLastError','getErrorList','getErrorMessages','getWarning','getNotice','getInfoMessage']
+                  for (const m of checks) {
+                    try {
+                      if (typeof props.ggbApplet[m] === 'function') {
+                        const r = props.ggbApplet[m]()
+                        console.debug('[DEBUG]', m, '→', JSON.stringify(r))
+                        if (r !== null && r !== undefined && r !== '' && !(Array.isArray(r) && r.length === 0)) {
+                          err = r; src = m; break
+                        }
+                      }
+                    } catch (e) { console.debug('[DEBUG]', m, '抛异常:', e.message) }
+                  }
+                  return { err, src }
+                }
+                let { err, src } = tryGetErr()
+                // 如果 evalCommand 返回 false 但没立刻查到，延迟 100ms 再查（GGB 可能异步刷新）
+                if (!err && evalResult === false) {
+                  console.debug('[DEBUG] 第一轮无错误，延迟 120ms 后再查...')
+                  await new Promise(r => setTimeout(r, 120))
+                  const again = tryGetErr()
+                  err = again.err; src = again.src
+                }
+                console.debug('[DEBUG] tryEval 最终 →', err ? '失败 [' + src + ']' : '成功', err ? 'msg=' + String(err).trim() : '')
+                if (err) return { ok: false, msg: (src ? '[' + src + '] ' : '') + String(err).trim() }
+                // evalCommand 返回 false 且所有错误渠道都没内容 → 判成功但加警告提示
+                if (evalResult === false) {
+                  console.warn('[DEBUG] evalCommand=false 但无任何错误信息 → 判成功（GGB API 不可靠）')
+                  return { ok: false, msg: '⚠ evalCommand 返回 false 但未检测到错误，可能成功也可能失败' }
+                }
+                return { ok: true, msg: '' }
               }
               const cmdMatch = line.match(/^\s*[A-Za-z]+/)
               const cmdAlias = cmdMatch ? cmdMatch[0].toLowerCase() : ''
@@ -135,12 +187,16 @@
                 if (jsApi.ok) { ok = true; output.value += 'ℹ️ ' + jsApi.msg + '\n' }
                 else { msg = jsApi.msg }
               } else {
-                const first = tryEval(line)
+                const first = await tryEval(line)
                 if (first.ok) ok = true
                 else msg = first.msg
               }
-              if (ok) { successCount++; output.value += '✅ ' + line + '\n'; await sleep(props.interval) }
-              else { errorCount++; hadError = true; output.value += '❌ ' + line + '\n   ' + msg + '\n'; await sleep(props.interval); if (manualStopped) break; const cont = await askOnError(line, msg); if (!cont) { userStopped = true; pendingLines = []; break }; if (manualStopped) break }
+              if (ok) {
+                console.debug('[DEBUG] 指令 → 成功:', line); successCount++; output.value += '✅ ' + line + '\n'; await sleep(props.interval) }
+              else {
+                console.warn('[DEBUG] 指令 → 失败:', line, 'msg=', msg);
+                console.debug('[DEBUG] → 即将调用 askOnError 弹出暂停对话框...');
+                errorCount++; hadError = true; output.value += '❌ ' + line + '\n   ' + msg + '\n'; await sleep(props.interval); if (manualStopped) break; const cont = await askOnError(line, msg); console.debug('[DEBUG] askOnError 用户选择:', cont); if (!cont) { userStopped = true; pendingLines = []; break }; if (manualStopped) break }
             }
             running.value = false; emit('update:running', false)
             if (manualStopped) { dialogType.value = 'info'; confirmMsg.value = '已手动停止执行\n\n执行统计：成功 ' + successCount + ' 条，失败 ' + errorCount + ' 条，剩余 ' + pendingLines.length + ' 条未执行' }

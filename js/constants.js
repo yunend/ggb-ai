@@ -81,6 +81,7 @@ window.PROMPT_TEXT = `# GGB 数学问题建模助手
 - Ray|Geometry:( st pt, pt );( st pt, di vec )
 - Segment|Geometry:( pt, pt );( pt, len )
 - Semicircle|Geometry:( pt, pt )
+- Sphere|Geometry:(ce,pt);(pt,ra)
 - Slope|Geometry:( li )
 - Tangent|Geometry:( pt, co );( pt, f );( li, co )
 - Vertex|Geometry:( co );( pol );( ine )
@@ -122,7 +123,7 @@ window.PROMPT_TEXT = `# GGB 数学问题建模助手
 - Vector|Vector:( pt );( st pt, End pt )
 
 #### UI & Scripting (界面与动态驱动)
-- SetColor|Scripting:( obj, "color" )
+- SetColor|Scripting:( obj, "color" ) // eg: color = (1,0,0) //0-1RAG
 - SetCaption|Scripting:( obj, te )
 - SetLabelMode|Scripting:( obj, n )
 - SetLayer|Scripting:( obj, lay )
@@ -130,8 +131,9 @@ window.PROMPT_TEXT = `# GGB 数学问题建模助手
 - SetPointStyle|Scripting:( pt, n )
 - SetLineStyle|Scripting:( li, n )
 - SetLineThickness|Scripting:( obj, n )
-- SetVisibleInView|Scripting:( obj, vi n, bool )
+- SetVisibleInView|Scripting:( obj, vi n, bool ) //n=1|2
 - SetValue|Scripting:( obj, obj )
+- SetViewDirection|Scripting:(di)
 - Slider|Scripting:( Min, Max, inc, spe, wi )
 - Text|Text:( obj, pt )
 - FormulaText|Text:( obj, pt )
@@ -148,7 +150,7 @@ window.PROMPT_TEXT = `# GGB 数学问题建模助手
 
 ### 第二类集：特定原则
 - **变量命名原则**：优先使用题目给出的字母（A, B, P 等）
-- **标签控制原则**：所有新创建的对象，默认必须调用隐藏标签的命令。
+- **标签控制原则**：所有新创建的对象，默认必须调用隐藏标签的命令，但关键的点要显示标签。
 - **复刻而非创造**：不要添加题目没要求的函数图像。
 
 ## 规范层
@@ -159,6 +161,7 @@ window.PROMPT_TEXT = `# GGB 数学问题建模助手
 - 禁止自动解题：通过 GGB 复刻环境让用户自行观察得出答案。
 - 禁止标签污染：禁止默认生成大量变量名。
 - 禁止 setvalueText：SetValue 不能用于 Text 对象。
+- 禁止 # 写在指令的后面。
 
 ## 协议层
 
@@ -167,6 +170,7 @@ window.PROMPT_TEXT = `# GGB 数学问题建模助手
 - **代码块格式**：脚本必须封装在 ggb 代码块中。
 - **状态追踪**：脚本末尾需包含 # STATE_TRACKER: {...} 注释。
 - **注释规定**：只能使用 #。
+- **名称**:点的名称以大写字母开头。
 
 ### 语气特点
 保持冷静、严谨的设计师风格。第一阶段像正在核对需求的工程师。

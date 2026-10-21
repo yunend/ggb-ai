@@ -58,10 +58,27 @@
       return wrapper
     }
 
+    function rebuildApplet() {
+      ggbApplet.value = null
+      try {
+        if (currentAppletWrapper) {
+          currentAppletWrapper.removeExistingApplet('ggb-element', false)
+        }
+      } catch (e) {
+        console.warn('removeExistingApplet failed:', e)
+      }
+      const container = document.getElementById('ggb-element')
+      if (container) container.innerHTML = ''
+      requestAnimationFrame(() => {
+        initGGBApplet()
+        requestAnimationFrame(() => resizeGGB())
+      })
+    }
+
     function switchPerspective(is3D) {
       if (!ggbApplet.value) return
       try {
-        ggbApplet.value.evalCommand(is3D ? 'SetPerspective("AGT")' : 'SetPerspective("AG")')
+        ggbApplet.value.evalCommand(is3D ? 'SetPerspective("AT")' : 'SetPerspective("AG")')
         perspectiveIs3D.value = is3D
       } catch (e) {
         console.warn('SetPerspective failed:', e)
@@ -69,10 +86,9 @@
     }
 
     function resetApplet() {
-      // 只清空所有对象，保留当前视角
-      if (ggbApplet.value) {
-        try { ggbApplet.value.evalCommand('Delete({})') } catch (e) { console.warn('resetApplet:', e) }
-      }
+      // 销毁并重建 Applet，最彻底地清空一切（对象、视角、内部状态全部归零）
+      perspectiveIs3D.value = false
+      rebuildApplet()
     }
 
     function toggleToolBar() {
