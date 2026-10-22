@@ -94,23 +94,13 @@
     # 几何构造
     AB = Segment(A, B)
     ShowLabel(AB, false)
-    SetColor(AB, "#616161")
+    SetColor(AB, red)
 
     # 视图控制（SetXxx/ShowXxx/HideXxx 前缀自动判定为脚本命令）
-    SetPerspective("G3D")
+    SetPerspective("GT")
     ShowGrid(false)
     SetConditionToShowObject(AB, true)
 
-### 错误判定规则
-
-GeoGebra classic 的 `evalCommand` 返回值有已知 bug，本项目采用以下三分支策略：
-
-| 命令类型 | evalCommand 返回 false + getError() 空 | getError() 有内容 | 抛异常 |
-|---|---|---|---|
-| **脚本命令**（Set/Show/Hide/Zoom/Get/Exists/Is/Reset...） | ✅ 成功（classic bug） | ❌ 失败 | ❌ 失败 |
-| **构造命令**（Circle/Polygon/Segment/Point/Sphere...） | ❌ 失败（静默错误） | ❌ 失败 | ❌ 失败 |
-
-> 设计参考 [GGBPuppy commandGateway.js](https://github.com/yunend/GGBPuppy) 的 executeGeoGebraCommand 策略，扩展了前缀分类以覆盖更多 script 命令。
 
 ## 🤖 AI 辅助建模（Trae Skill）
 
@@ -149,14 +139,6 @@ Skill 位置：`.trae/skills/geogebra-ai-coding/`
 | 状态管理 | Vue 3 reactivity（ref/computed） | 无额外状态库 |
 | 构建 | **无** | 纯静态资源，`file://` 直接可用 |
 
-## ⚠️ 已知限制
-
-| 限制 | 原因 |
-|---|---|
-| 需要手动下载外部依赖 | `js/vue*.js` 和 `js/tailwind*.js` 不在仓库中（版权/体积） |
-| Tailwind CDN 仅开发可用 | 生产应改为预编译 CSS，但零构建路线刻意保留 CDN |
-| 某些 GGB 命令 classic 不识别 | 如 `ShowView`、`SetCoordSystem` 部分子参数，2D 视图下受限 |
-| `SetConditionToShowObject` 批量执行时偶有延迟 | GeoGebra 内部异步刷新，已通过 120ms 延迟+重试缓解 |
 
 ## 📄 License
 
